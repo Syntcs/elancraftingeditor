@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ELAN Server - Arma Reforger Crafting Editor</title>
+  <title>Team ELAN - Crafting Recipes Editor</title>
   <style>
     :root {
       --bg-dark: #18181b;
@@ -196,6 +196,7 @@
       border-radius: 0.25rem;
       cursor: pointer;
       justify-content: space-between;
+      margin-bottom: 0.25rem; /* Add spacing between items */
     }
 
     .tree-item-header:hover {
@@ -632,7 +633,7 @@
   <!-- Header -->
   <header>
     <div class="header-content">
-      <h1>ELAN Server - Arma Reforger Crafting Editor</h1>
+      <h1>Team ELAN - Crafting Recipes Editor</h1>
     </div>
   </header>
 
@@ -798,6 +799,7 @@
           </div>
           <div class="form-group">
             <button id="update-from-full-json-button" class="button">Update from JSON</button>
+            <button id="copy-json-button" class="button">Copy</button>
           </div>
         </div>
       </div>
@@ -1103,7 +1105,6 @@
               </button>
             </div>
             <button class="button small add-subcategory-tree-button" data-category="${categoryKey}">+ Sub</button>
-            <button class="button small add-item-tree-button" data-category="${categoryKey}">+ Item</button>
           </div>
         `;
         
@@ -2569,79 +2570,83 @@
     }
     
     function calculateTotalMaterials() {
-      // Get current item
-      let item;
-      
-      if (currentSelection.subcategoryKey) {
-        item = craftingData[currentSelection.categoryKey].subcategories[currentSelection.subcategoryKey].items
-          .find(i => i.id === currentSelection.itemId);
-      } else {
-        item = craftingData[currentSelection.categoryKey].items
-          .find(i => i.id === currentSelection.itemId);
-      }
-      
-      if (!item.items || item.items.length === 0) {
-        alert('No components to calculate materials from');
+  // Get current item
+  let item;
+  
+  if (currentSelection.subcategoryKey) {
+    item = craftingData[currentSelection.categoryKey].subcategories[currentSelection.subcategoryKey].items
+      .find(i => i.id === currentSelection.itemId);
+  } else {
+    item = craftingData[currentSelection.categoryKey].items
+      .find(i => i.id === currentSelection.itemId);
+  }
+  
+  if (!item.items || item.items.length === 0) {
+    alert('No components to calculate materials from');
+    return;
+  }
+  
+  // Calculate total materials
+  const materialsMap = new Map();
+  
+  // Process each component
+  item.items.forEach(component => {
+    // First, identify materials that have submaterials
+    const materialsWithSubs = new Set();
+    if (component.subMaterials) {
+      Object.keys(component.subMaterials).forEach(materialName => {
+        materialsWithSubs.add(materialName);
+      });
+    }
+    
+    // Process direct materials (only if they don't have submaterials)
+    component.materials.forEach(material => {
+      // Skip materials that have submaterials
+      if (materialsWithSubs.has(material.name)) {
         return;
       }
       
-      // Calculate total materials
-      const materialsMap = new Map();
-      
-      // Process each component
-      item.items.forEach(component => {
-        // Process direct materials
-        component.materials.forEach(material => {
-          const totalQuantity = material.quantity * component.quantity;
-          
-          if (materialsMap.has(material.name)) {
-            materialsMap.set(material.name, materialsMap.get(material.name) + totalQuantity);
+      // Simply add the quantities (no multiplication)
+      if (materialsMap.has(material.name)) {
+        materialsMap.set(material.name, materialsMap.get(material.name) + material.quantity);
+      } else {
+        materialsMap.set(material.name, material.quantity);
+      }
+    });
+    
+    // Process submaterials if they exist
+    if (component.subMaterials) {
+      Object.entries(component.subMaterials).forEach(([materialName, subMaterials]) => {
+        // Process each submaterial
+        subMaterials.forEach(subMaterial => {
+          // Simply add the quantities (no multiplication)
+          if (materialsMap.has(subMaterial.name)) {
+            materialsMap.set(subMaterial.name, materialsMap.get(subMaterial.name) + subMaterial.quantity);
           } else {
-            materialsMap.set(material.name, totalQuantity);
+            materialsMap.set(subMaterial.name, subMaterial.quantity);
           }
         });
-        
-        // Process submaterials if they exist
-        if (component.subMaterials) {
-          Object.entries(component.subMaterials).forEach(([materialName, subMaterials]) => {
-            // Find the quantity of the parent material
-            const parentMaterial = component.materials.find(m => m.name === materialName);
-            
-            if (parentMaterial) {
-              const parentQuantity = parentMaterial.quantity * component.quantity;
-              
-              // Process each submaterial
-              subMaterials.forEach(subMaterial => {
-                const totalQuantity = subMaterial.quantity * parentQuantity;
-                
-                if (materialsMap.has(subMaterial.name)) {
-                  materialsMap.set(subMaterial.name, materialsMap.get(subMaterial.name) + totalQuantity);
-                } else {
-                  materialsMap.set(subMaterial.name, totalQuantity);
-                }
-              });
-            }
-          });
-        }
       });
-      
-      // Convert map to array
-      const totalMaterials = Array.from(materialsMap.entries()).map(([name, quantity]) => ({
-        name,
-        quantity
-      }));
-      
-      // Update item
-      item.totalMaterials = totalMaterials;
-      
-      // Update material list
-      updateMaterialList(totalMaterials);
-      
-      // Update JSON
-      itemJsonEl.value = formatJSON(item);
-      
-      alert('Total materials calculated successfully');
     }
+  });
+  
+  // Convert map to array
+  const totalMaterials = Array.from(materialsMap.entries()).map(([name, quantity]) => ({
+    name,
+    quantity
+  }));
+  
+  // Update item
+  item.totalMaterials = totalMaterials;
+  
+  // Update material list
+  updateMaterialList(totalMaterials);
+  
+  // Update JSON
+  itemJsonEl.value = formatJSON(item);
+  
+  alert('Total materials calculated successfully');
+}
     
     // Event Listeners
     
@@ -3211,6 +3216,25 @@ fetchUrlButtonEl.addEventListener('click', async () => {
     fetchUrlButtonEl.textContent = 'Load';
     fetchUrlButtonEl.disabled = false;
   }
+});
+
+// Copy JSON to clipboard
+const copyJsonButtonEl = document.getElementById('copy-json-button');
+copyJsonButtonEl.addEventListener('click', () => {
+  const jsonText = fullJsonEl.value;
+  navigator.clipboard.writeText(jsonText)
+    .then(() => {
+      // Show temporary success message
+      const originalText = copyJsonButtonEl.textContent;
+      copyJsonButtonEl.textContent = 'Copied!';
+      setTimeout(() => {
+        copyJsonButtonEl.textContent = originalText;
+      }, 2000);
+    })
+    .catch(err => {
+      console.error('Failed to copy: ', err);
+      alert('Failed to copy to clipboard');
+    });
 });
   </script>
 </body>
