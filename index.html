@@ -1341,77 +1341,127 @@
       updateTreeView();
     }
 
-    function moveSubcategory(categoryKey, subcategoryKey, direction) {
-      const category = craftingData[categoryKey];
-      const subcategoryKeys = Object.keys(category.subcategories);
-      const currentIndex = subcategoryKeys.indexOf(subcategoryKey);
-      
-      // Calculate new index
-      let newIndex;
-      if (direction === 'up') {
-        if (currentIndex <= 0) return; // Already at the top
-        newIndex = currentIndex - 1;
-      } else {
-        if (currentIndex >= subcategoryKeys.length - 1) return; // Already at the bottom
-        newIndex = currentIndex + 1;
-      }
-      
-      // Swap with adjacent subcategory
-      const adjacentKey = subcategoryKeys[newIndex];
-      
-      // Create a new object with the correct order
-      const newSubcategories = {};
-      
-      subcategoryKeys.forEach((key, index) => {
-        if (index === currentIndex) {
-          // Skip, we'll add it in the new position
-        } else if (index === newIndex) {
-          if (direction === 'up') {
-            newSubcategories[subcategoryKey] = category.subcategories[subcategoryKey];
-            newSubcategories[adjacentKey] = category.subcategories[adjacentKey];
-          } else {
-            newSubcategories[adjacentKey] = category.subcategories[adjacentKey];
-            newSubcategories[subcategoryKey] = category.subcategories[subcategoryKey];
-          }
-        } else {
-          newSubcategories[key] = category.subcategories[key];
-        }
-      });
-      
-      // Update category subcategories
-      category.subcategories = newSubcategories;
-      
-      // Update UI
-      updateTreeView();
+// Replace the moveSubcategory function with this improved version
+function moveSubcategory(categoryKey, subcategoryKey, direction) {
+  const category = craftingData[categoryKey];
+  if (!category || !category.subcategories) return;
+  
+  // Get all subcategory keys in their current order
+  const subcategoryKeys = Object.keys(category.subcategories);
+  const currentIndex = subcategoryKeys.indexOf(subcategoryKey);
+  
+  if (currentIndex === -1) return; // Subcategory not found
+  
+  // Calculate new index
+  let newIndex;
+  if (direction === 'up') {
+    if (currentIndex <= 0) return; // Already at the top
+    newIndex = currentIndex - 1;
+  } else {
+    if (currentIndex >= subcategoryKeys.length - 1) return; // Already at the bottom
+    newIndex = currentIndex + 1;
+  }
+  
+  // Get the key to swap with
+  const swapKey = subcategoryKeys[newIndex];
+  
+  // Create a completely new subcategories object to ensure proper order
+  const newSubcategories = {};
+  
+  // Add all subcategories in the correct order
+  subcategoryKeys.forEach((key, index) => {
+    // Skip the keys we're moving - we'll add them in the correct order
+    if (key !== subcategoryKey && key !== swapKey) {
+      newSubcategories[key] = category.subcategories[key];
     }
+  });
+  
+  // Now add the swapped subcategories in the correct order
+  if (direction === 'up') {
+    // Current subcategory moves up (before the swap subcategory)
+    newSubcategories[subcategoryKey] = category.subcategories[subcategoryKey];
+    newSubcategories[swapKey] = category.subcategories[swapKey];
+  } else {
+    // Current subcategory moves down (after the swap subcategory)
+    newSubcategories[swapKey] = category.subcategories[swapKey];
+    newSubcategories[subcategoryKey] = category.subcategories[subcategoryKey];
+  }
+  
+  // Create the final subcategories object with the correct order
+  const finalSubcategories = {};
+  
+  // Add all subcategories in the correct order
+  subcategoryKeys.forEach((key, index) => {
+    if (index === currentIndex) {
+      // Skip, we'll add it in the new position
+    } else if (index === newIndex) {
+      if (direction === 'up') {
+        finalSubcategories[subcategoryKey] = category.subcategories[subcategoryKey];
+        finalSubcategories[swapKey] = category.subcategories[swapKey];
+      } else {
+        finalSubcategories[swapKey] = category.subcategories[swapKey];
+        finalSubcategories[subcategoryKey] = category.subcategories[subcategoryKey];
+      }
+    } else {
+      finalSubcategories[key] = category.subcategories[key];
+    }
+  });
+  
+  // Replace the subcategories object
+  category.subcategories = finalSubcategories;
+  
+  // Update UI
+  updateTreeView();
+}
 
-    function moveItem(categoryKey, subcategoryKey, itemIndex, direction) {
-      let items;
-      
-      if (subcategoryKey) {
-        items = craftingData[categoryKey].subcategories[subcategoryKey].items;
-      } else {
-        items = craftingData[categoryKey].items;
-      }
-      
-      // Calculate new index
-      let newIndex;
-      if (direction === 'up') {
-        if (itemIndex <= 0) return; // Already at the top
-        newIndex = itemIndex - 1;
-      } else {
-        if (itemIndex >= items.length - 1) return; // Already at the bottom
-        newIndex = itemIndex + 1;
-      }
-      
-      // Swap items
-      const temp = items[itemIndex];
-      items[itemIndex] = items[newIndex];
-      items[newIndex] = temp;
-      
-      // Update UI
-      updateTreeView();
-    }
+// Replace the moveItem function with this improved version
+function moveItem(categoryKey, subcategoryKey, itemIndex, direction) {
+  let items;
+  
+  if (subcategoryKey) {
+    // Get items from subcategory
+    items = craftingData[categoryKey].subcategories[subcategoryKey].items;
+  } else {
+    // Get items from category
+    items = craftingData[categoryKey].items;
+  }
+  
+  if (!items || !Array.isArray(items)) {
+    console.error("Items array not found or not an array");
+    return;
+  }
+  
+  // Calculate new index
+  let newIndex;
+  if (direction === 'up') {
+    if (itemIndex <= 0) return; // Already at the top
+    newIndex = itemIndex - 1;
+  } else {
+    if (itemIndex >= items.length - 1) return; // Already at the bottom
+    newIndex = itemIndex + 1;
+  }
+  
+  // Create a copy of the items array
+  const newItems = [...items];
+  
+  // Get the items to swap
+  const currentItem = newItems[itemIndex];
+  const swapItem = newItems[newIndex];
+  
+  // Swap the items
+  newItems[itemIndex] = swapItem;
+  newItems[newIndex] = currentItem;
+  
+  // Update the items array
+  if (subcategoryKey) {
+    craftingData[categoryKey].subcategories[subcategoryKey].items = newItems;
+  } else {
+    craftingData[categoryKey].items = newItems;
+  }
+  
+  // Update UI
+  updateTreeView();
+}
     
     function selectCategory(categoryKey) {
       currentSelection = {
